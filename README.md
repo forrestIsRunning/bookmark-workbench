@@ -11,6 +11,7 @@ It turns the default new tab into a compact bookmark workspace with nested folde
 - Search by title, domain, URL, and folder path.
 - Sort by recent, title, domain, or folder.
 - Add, edit, and delete bookmarks directly from the page.
+- Create, rename, and delete folders from the folder tree.
 - Toggle compact density for larger bookmark collections.
 - Use keyboard shortcuts: `/` to search, `Enter` to open the first result, `Esc` to clear filters.
 - Respect the browser language for date/time formatting and sorting.
@@ -56,7 +57,7 @@ Then:
 
 Bookmark Workbench asks for:
 
-- `bookmarks`: read and update your Chrome bookmarks.
+- `bookmarks`: read, create, update, and delete your Chrome bookmarks and folders.
 - `favicon`: show site icons for bookmark cards.
 
 The extension does not send bookmark data to any server.

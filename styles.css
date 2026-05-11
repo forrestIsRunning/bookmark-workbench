@@ -166,6 +166,7 @@ kbd {
 .bookmark-card,
 .section-head button,
 .card-action,
+.folder-action,
 .dialog-actions button,
 select {
   border: 1px solid var(--line);
@@ -238,7 +239,8 @@ select {
   cursor: pointer;
 }
 
-.view-controls {
+.view-controls,
+.folder-controls {
   display: inline-flex;
   gap: 8px;
   align-items: center;
@@ -254,7 +256,7 @@ select {
 
 .folder-row {
   display: grid;
-  grid-template-columns: 26px 1fr;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
   gap: 4px;
   align-items: center;
   padding-left: calc(var(--depth) * 14px);
@@ -319,6 +321,29 @@ select {
 .folder-row.active .folder-btn {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+.folder-actions {
+  display: inline-flex;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.folder-row:hover .folder-actions,
+.folder-row:focus-within .folder-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.folder-action {
+  min-height: 28px;
+  padding: 0 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
 }
 
 .folder-name {

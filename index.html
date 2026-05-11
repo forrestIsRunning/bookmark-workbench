@@ -35,7 +35,10 @@
         <aside class="sidebar" aria-label="Bookmark folders">
           <div class="section-head">
             <span>Folders</span>
-            <button id="clearFilter" type="button">All</button>
+            <div class="folder-controls">
+              <button id="addFolder" type="button">New</button>
+              <button id="clearFilter" type="button">All</button>
+            </div>
           </div>
           <nav id="folders" class="folders"></nav>
         </aside>
@@ -78,6 +81,24 @@
           <span class="dialog-spacer"></span>
           <button id="cancelDialog" type="button">Cancel</button>
           <button id="saveBookmark" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="folderDialog" class="bookmark-dialog">
+      <form id="folderForm" method="dialog">
+        <h2 id="folderDialogTitle">Edit folder</h2>
+        <input id="folderId" type="hidden">
+        <label>
+          <span>Name</span>
+          <input id="folderName" type="text" autocomplete="off" required>
+        </label>
+        <p id="folderDialogPath" class="dialog-folder"></p>
+        <div class="dialog-actions">
+          <button id="deleteFolder" type="button" class="danger">Delete folder</button>
+          <span class="dialog-spacer"></span>
+          <button id="cancelFolderDialog" type="button">Cancel</button>
+          <button id="saveFolder" type="submit">Save</button>
         </div>
       </form>
     </dialog>

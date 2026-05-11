@@ -21,6 +21,7 @@ const els = {
   domainPills: document.querySelector("#domainPills"),
   folders: document.querySelector("#folders"),
   clearFilter: document.querySelector("#clearFilter"),
+  addFolder: document.querySelector("#addFolder"),
   addBookmark: document.querySelector("#addBookmark"),
   sortMode: document.querySelector("#sortMode"),
   densityToggle: document.querySelector("#densityToggle"),
@@ -37,6 +38,15 @@ const els = {
   deleteBookmark: document.querySelector("#deleteBookmark"),
   cancelDialog: document.querySelector("#cancelDialog"),
   saveBookmark: document.querySelector("#saveBookmark"),
+  folderDialog: document.querySelector("#folderDialog"),
+  folderForm: document.querySelector("#folderForm"),
+  folderDialogTitle: document.querySelector("#folderDialogTitle"),
+  folderId: document.querySelector("#folderId"),
+  folderName: document.querySelector("#folderName"),
+  folderDialogPath: document.querySelector("#folderDialogPath"),
+  deleteFolder: document.querySelector("#deleteFolder"),
+  cancelFolderDialog: document.querySelector("#cancelFolderDialog"),
+  saveFolder: document.querySelector("#saveFolder"),
 };
 
 function faviconUrl(pageUrl) {
@@ -110,6 +120,7 @@ function buildFolderTree(nodes, trail = [], depth = 0) {
       state.folderIdByPath.set(path, node.id);
       folders.push({
         id: node.id,
+        parentId: node.parentId,
         name: node.title || "Bookmarks",
         path,
         depth,
@@ -177,6 +188,10 @@ function selectedParentId() {
   return state.folderTree[0]?.id || "1";
 }
 
+function selectedFolderPath() {
+  return state.folderFilter || state.folderTree[0]?.path || "Bookmarks bar";
+}
+
 function openBookmarkDialog(item = null) {
   els.dialogTitle.textContent = item ? "Edit bookmark" : "Add bookmark";
   els.bookmarkId.value = item?.id || "";
@@ -193,6 +208,23 @@ function openBookmarkDialog(item = null) {
 function closeBookmarkDialog() {
   els.dialog.close();
   els.form.reset();
+}
+
+function openFolderDialog(folder = null) {
+  els.folderDialogTitle.textContent = folder ? "Edit folder" : "New folder";
+  els.folderId.value = folder?.id || "";
+  els.folderName.value = folder?.name || "";
+  els.folderDialogPath.textContent = folder
+    ? `Path: ${folder.path}`
+    : `Create inside: ${selectedFolderPath()}`;
+  els.deleteFolder.hidden = !folder;
+  els.folderDialog.showModal();
+  els.folderName.focus();
+}
+
+function closeFolderDialog() {
+  els.folderDialog.close();
+  els.folderForm.reset();
 }
 
 function normalizeUrl(value) {
@@ -231,6 +263,72 @@ async function deleteBookmarkFromDialog() {
   await chrome.bookmarks.remove(id);
   closeBookmarkDialog();
   await reloadBookmarks();
+}
+
+function nextPathAfterRename(currentPath, nextName) {
+  const parts = currentPath.split(" / ").filter(Boolean);
+  parts[parts.length - 1] = nextName;
+  return parts.join(" / ");
+}
+
+function replacePathPrefix(path, oldPrefix, nextPrefix) {
+  if (path === oldPrefix) return nextPrefix;
+  if (path.startsWith(`${oldPrefix} / `)) return `${nextPrefix}${path.slice(oldPrefix.length)}`;
+  return path;
+}
+
+async function saveFolderFromDialog() {
+  const id = els.folderId.value;
+  const title = els.folderName.value.trim();
+
+  if (id) {
+    const folder = findFolderById(id);
+    if (folder) {
+      const nextPath = nextPathAfterRename(folder.path, title);
+      state.expandedFolders.delete(folder.path);
+      state.expandedFolders.add(nextPath);
+      if (state.folderFilter === folder.path || state.folderFilter.startsWith(`${folder.path} / `)) {
+        state.folderFilter = replacePathPrefix(state.folderFilter, folder.path, nextPath);
+      }
+    }
+    await chrome.bookmarks.update(id, { title });
+  } else {
+    const created = await chrome.bookmarks.create({ parentId: selectedParentId(), title });
+    const parentPath = selectedFolderPath();
+    const nextPath = `${parentPath} / ${created?.title || title}`;
+    state.expandedFolders.add(parentPath);
+    state.expandedFolders.add(nextPath);
+    state.folderFilter = nextPath;
+  }
+
+  closeFolderDialog();
+  await reloadBookmarks();
+}
+
+async function deleteFolderFromDialog() {
+  const id = els.folderId.value;
+  const folder = findFolderById(id);
+  if (!id || !folder) return;
+
+  const confirmed = confirm(`Delete folder "${folder.name}" and all bookmarks inside it?`);
+  if (!confirmed) return;
+
+  await chrome.bookmarks.removeTree(id);
+  if (state.folderFilter === folder.path || state.folderFilter.startsWith(`${folder.path} / `)) {
+    state.folderFilter = "";
+  }
+  state.expandedFolders.delete(folder.path);
+  closeFolderDialog();
+  await reloadBookmarks();
+}
+
+function findFolderById(id, folders = state.folderTree) {
+  for (const folder of folders) {
+    if (folder.id === id) return folder;
+    const child = findFolderById(id, folder.children);
+    if (child) return child;
+  }
+  return null;
 }
 
 function renderFolders() {
@@ -279,7 +377,15 @@ function renderFolders() {
       render();
     });
 
-    row.append(toggle, button);
+    const actions = document.createElement("span");
+    actions.className = "folder-actions";
+    actions.innerHTML = `<button class="folder-action edit-folder" type="button">Edit</button>`;
+    actions.querySelector(".edit-folder").addEventListener("click", (event) => {
+      event.stopPropagation();
+      openFolderDialog(folder);
+    });
+
+    row.append(toggle, button, actions);
     return row;
   }));
 }
@@ -402,6 +508,8 @@ els.sortMode.addEventListener("change", (event) => {
 
 els.addBookmark.addEventListener("click", () => openBookmarkDialog());
 
+els.addFolder.addEventListener("click", () => openFolderDialog());
+
 els.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   await saveBookmarkFromDialog();
@@ -415,6 +523,19 @@ els.dialog.addEventListener("click", (event) => {
   if (event.target === els.dialog) closeBookmarkDialog();
 });
 
+els.folderForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveFolderFromDialog();
+});
+
+els.deleteFolder.addEventListener("click", deleteFolderFromDialog);
+
+els.cancelFolderDialog.addEventListener("click", closeFolderDialog);
+
+els.folderDialog.addEventListener("click", (event) => {
+  if (event.target === els.folderDialog) closeFolderDialog();
+});
+
 els.densityToggle.addEventListener("click", () => {
   state.density = state.density === "compact" ? "comfortable" : "compact";
   updateDensity();
@@ -423,7 +544,7 @@ els.densityToggle.addEventListener("click", () => {
 document.addEventListener("keydown", (event) => {
   const isTyping = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
 
-  if (els.dialog.open) return;
+  if (els.dialog.open || els.folderDialog.open) return;
 
   if (event.key === "/" && !isTyping) {
     event.preventDefault();
