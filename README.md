@@ -12,6 +12,7 @@ It turns the default new tab into a compact bookmark workspace with nested folde
 - Sort by recent, title, domain, or folder.
 - Add, edit, and delete bookmarks directly from the page.
 - Create, rename, and delete folders from the folder tree.
+- Right-click a folder to create a subfolder, rename it, or delete it.
 - Drag bookmarks onto folders to move them.
 - Use `Manual` sort to drag bookmarks before another bookmark in the same folder.
 - Toggle compact density for larger bookmark collections.
