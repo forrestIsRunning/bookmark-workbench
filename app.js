@@ -9,6 +9,7 @@ const state = {
   sortMode: "manual",
   density: localStorage.getItem("bookmark-workbench-density") || "comfortable",
   draggingBookmarkId: "",
+  refreshTimer: 0,
 };
 
 const locale = navigator.language || "en-US";
@@ -273,6 +274,13 @@ async function reloadBookmarks() {
   await loadBookmarks();
 }
 
+function scheduleBookmarkRefresh() {
+  window.clearTimeout(state.refreshTimer);
+  state.refreshTimer = window.setTimeout(() => {
+    reloadBookmarks();
+  }, 80);
+}
+
 async function saveBookmarkFromDialog() {
   const id = els.bookmarkId.value;
   const title = els.bookmarkTitle.value.trim();
@@ -285,7 +293,7 @@ async function saveBookmarkFromDialog() {
   }
 
   closeBookmarkDialog();
-  await reloadBookmarks();
+  scheduleBookmarkRefresh();
 }
 
 async function deleteBookmarkFromDialog() {
@@ -297,7 +305,7 @@ async function deleteBookmarkFromDialog() {
 
   await chrome.bookmarks.remove(id);
   closeBookmarkDialog();
-  await reloadBookmarks();
+  scheduleBookmarkRefresh();
 }
 
 function nextPathAfterRename(currentPath, nextName) {
@@ -337,7 +345,7 @@ async function saveFolderFromDialog() {
   }
 
   closeFolderDialog();
-  await reloadBookmarks();
+  scheduleBookmarkRefresh();
 }
 
 async function deleteFolderFromDialog() {
@@ -358,7 +366,7 @@ async function deleteFolder(folder) {
   state.expandedFolders.delete(folder.path);
   closeFolderDialog();
   closeFolderMenu();
-  await reloadBookmarks();
+  scheduleBookmarkRefresh();
 }
 
 function findFolderById(id, folders = state.folderTree) {
@@ -385,7 +393,7 @@ async function moveBookmarkToFolder(bookmarkId, folder) {
   state.folderFilter = folder.path;
   state.expandedFolders.add(folder.path);
   await chrome.bookmarks.move(bookmarkId, { parentId: folder.id });
-  await reloadBookmarks();
+  scheduleBookmarkRefresh();
 }
 
 async function moveBookmarkBefore(bookmarkId, targetId) {
@@ -397,7 +405,7 @@ async function moveBookmarkBefore(bookmarkId, targetId) {
 
   const nextIndex = source.index < target.index ? target.index - 1 : target.index;
   await chrome.bookmarks.move(bookmarkId, { parentId: target.parentId, index: Math.max(nextIndex, 0) });
-  await reloadBookmarks();
+  scheduleBookmarkRefresh();
 }
 
 function renderFolders() {
@@ -702,6 +710,13 @@ document.addEventListener("keydown", (event) => {
     firstVisibleBookmark()?.click();
   }
 });
+
+chrome.bookmarks.onCreated.addListener(scheduleBookmarkRefresh);
+chrome.bookmarks.onRemoved.addListener(scheduleBookmarkRefresh);
+chrome.bookmarks.onChanged.addListener(scheduleBookmarkRefresh);
+chrome.bookmarks.onMoved.addListener(scheduleBookmarkRefresh);
+chrome.bookmarks.onChildrenReordered.addListener(scheduleBookmarkRefresh);
+chrome.bookmarks.onImportEnded.addListener(scheduleBookmarkRefresh);
 
 updateDensity();
 updateClock();
