@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,7 +16,14 @@
         </section>
         <section class="search-wrap">
           <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="Search title, domain, folder...">
-          <div id="stats" class="stats"></div>
+          <div class="search-meta">
+            <div id="stats" class="stats"></div>
+            <div class="shortcuts" aria-label="Keyboard shortcuts">
+              <kbd>/</kbd> Search
+              <kbd>Enter</kbd> Open first
+              <kbd>Esc</kbd> Clear
+            </div>
+          </div>
         </section>
       </header>
 
@@ -36,18 +43,44 @@
         <section class="content">
           <div class="section-head content-head">
             <span id="resultTitle">Bookmarks</span>
-            <select id="sortMode" aria-label="Sort bookmarks">
-              <option value="smart">Smart</option>
-              <option value="title">Title</option>
-              <option value="domain">Domain</option>
-              <option value="folder">Folder</option>
-            </select>
+            <div class="view-controls">
+              <button id="addBookmark" type="button">Add</button>
+              <button id="densityToggle" type="button" aria-pressed="false">Compact</button>
+              <select id="sortMode" aria-label="Sort bookmarks">
+                <option value="smart">Recent</option>
+                <option value="title">Title</option>
+                <option value="domain">Domain</option>
+                <option value="folder">Folder</option>
+              </select>
+            </div>
           </div>
           <div id="bookmarks" class="bookmark-grid"></div>
           <div id="empty" class="empty" hidden>No bookmarks match this view.</div>
         </section>
       </section>
     </main>
+
+    <dialog id="bookmarkDialog" class="bookmark-dialog">
+      <form id="bookmarkForm" method="dialog">
+        <h2 id="dialogTitle">Edit bookmark</h2>
+        <input id="bookmarkId" type="hidden">
+        <label>
+          <span>Title</span>
+          <input id="bookmarkTitle" type="text" autocomplete="off" required>
+        </label>
+        <label>
+          <span>URL</span>
+          <input id="bookmarkUrl" type="url" autocomplete="off" required>
+        </label>
+        <p id="dialogFolder" class="dialog-folder"></p>
+        <div class="dialog-actions">
+          <button id="deleteBookmark" type="button" class="danger">Delete</button>
+          <span class="dialog-spacer"></span>
+          <button id="cancelDialog" type="button">Cancel</button>
+          <button id="saveBookmark" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
     <script src="app.js"></script>
   </body>
 </html>

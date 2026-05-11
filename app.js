@@ -2,11 +2,16 @@ const state = {
   all: [],
   folderTree: [],
   folderFilter: "",
+  folderIdByPath: new Map(),
   expandedFolders: new Set(),
   query: "",
   domainFilter: "",
   sortMode: "smart",
+  density: localStorage.getItem("bookmark-workbench-density") || "comfortable",
 };
+
+const locale = navigator.language || "en-US";
+const collator = new Intl.Collator(locale, { numeric: true, sensitivity: "base" });
 
 const els = {
   clock: document.querySelector("#clock"),
@@ -16,10 +21,22 @@ const els = {
   domainPills: document.querySelector("#domainPills"),
   folders: document.querySelector("#folders"),
   clearFilter: document.querySelector("#clearFilter"),
+  addBookmark: document.querySelector("#addBookmark"),
   sortMode: document.querySelector("#sortMode"),
+  densityToggle: document.querySelector("#densityToggle"),
   resultTitle: document.querySelector("#resultTitle"),
   bookmarks: document.querySelector("#bookmarks"),
   empty: document.querySelector("#empty"),
+  dialog: document.querySelector("#bookmarkDialog"),
+  form: document.querySelector("#bookmarkForm"),
+  dialogTitle: document.querySelector("#dialogTitle"),
+  bookmarkId: document.querySelector("#bookmarkId"),
+  bookmarkTitle: document.querySelector("#bookmarkTitle"),
+  bookmarkUrl: document.querySelector("#bookmarkUrl"),
+  dialogFolder: document.querySelector("#dialogFolder"),
+  deleteBookmark: document.querySelector("#deleteBookmark"),
+  cancelDialog: document.querySelector("#cancelDialog"),
+  saveBookmark: document.querySelector("#saveBookmark"),
 };
 
 function faviconUrl(pageUrl) {
@@ -60,6 +77,7 @@ function flattenBookmarks(nodes, trail = []) {
         url: node.url,
         domain: hostname(node.url),
         folder,
+        parentId: node.parentId,
         dateAdded: Number(node.dateAdded || 0),
         haystack: `${node.title || ""} ${node.url} ${folder}`.toLowerCase(),
       });
@@ -89,6 +107,7 @@ function buildFolderTree(nodes, trail = [], depth = 0) {
     const count = countBookmarks(node);
 
     if (path && count > 0) {
+      state.folderIdByPath.set(path, node.id);
       folders.push({
         id: node.id,
         name: node.title || "Bookmarks",
@@ -107,12 +126,12 @@ function buildFolderTree(nodes, trail = [], depth = 0) {
 
 function updateClock() {
   const now = new Date();
-  els.clock.textContent = now.toLocaleTimeString("zh-CN", {
+  els.clock.textContent = now.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
-  els.today.textContent = now.toLocaleDateString("zh-CN", {
+  els.today.textContent = now.toLocaleDateString(locale, {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -120,7 +139,6 @@ function updateClock() {
 }
 
 function sortBookmarks(items) {
-  const collator = new Intl.Collator("zh-CN", { numeric: true, sensitivity: "base" });
   return [...items].sort((a, b) => {
     if (state.sortMode === "title") return collator.compare(a.title, b.title);
     if (state.sortMode === "domain") return collator.compare(a.domain, b.domain) || collator.compare(a.title, b.title);
@@ -137,6 +155,82 @@ function filteredBookmarks() {
     if (query && !item.haystack.includes(query)) return false;
     return true;
   }));
+}
+
+function firstVisibleBookmark() {
+  return els.bookmarks.querySelector(".bookmark-link");
+}
+
+function updateDensity() {
+  document.body.dataset.density = state.density;
+  const compact = state.density === "compact";
+  els.densityToggle.textContent = compact ? "Comfortable" : "Compact";
+  els.densityToggle.setAttribute("aria-pressed", String(compact));
+  localStorage.setItem("bookmark-workbench-density", state.density);
+}
+
+function selectedParentId() {
+  if (state.folderFilter && state.folderIdByPath.has(state.folderFilter)) {
+    return state.folderIdByPath.get(state.folderFilter);
+  }
+
+  return state.folderTree[0]?.id || "1";
+}
+
+function openBookmarkDialog(item = null) {
+  els.dialogTitle.textContent = item ? "Edit bookmark" : "Add bookmark";
+  els.bookmarkId.value = item?.id || "";
+  els.bookmarkTitle.value = item?.title || "";
+  els.bookmarkUrl.value = item?.url || "";
+  els.dialogFolder.textContent = item
+    ? `Folder: ${item.folder}`
+    : `Folder: ${state.folderFilter || state.folderTree[0]?.path || "Bookmarks bar"}`;
+  els.deleteBookmark.hidden = !item;
+  els.dialog.showModal();
+  els.bookmarkTitle.focus();
+}
+
+function closeBookmarkDialog() {
+  els.dialog.close();
+  els.form.reset();
+}
+
+function normalizeUrl(value) {
+  const trimmed = value.trim();
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+async function reloadBookmarks() {
+  if (state.folderFilter) state.expandedFolders.add(state.folderFilter);
+  await loadBookmarks();
+}
+
+async function saveBookmarkFromDialog() {
+  const id = els.bookmarkId.value;
+  const title = els.bookmarkTitle.value.trim();
+  const url = normalizeUrl(els.bookmarkUrl.value);
+
+  if (id) {
+    await chrome.bookmarks.update(id, { title, url });
+  } else {
+    await chrome.bookmarks.create({ parentId: selectedParentId(), title, url });
+  }
+
+  closeBookmarkDialog();
+  await reloadBookmarks();
+}
+
+async function deleteBookmarkFromDialog() {
+  const id = els.bookmarkId.value;
+  if (!id) return;
+
+  const confirmed = confirm("Delete this bookmark?");
+  if (!confirmed) return;
+
+  await chrome.bookmarks.remove(id);
+  closeBookmarkDialog();
+  await reloadBookmarks();
 }
 
 function renderFolders() {
@@ -159,7 +253,7 @@ function renderFolders() {
     const toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "folder-toggle";
-    toggle.title = folder.children.length ? "Expand folder" : "No subfolders";
+    toggle.title = folder.children.length ? "Toggle folder" : "No subfolders";
     toggle.textContent = folder.children.length ? (state.expandedFolders.has(folder.path) ? "⌄" : "›") : "";
     toggle.disabled = folder.children.length === 0;
     toggle.addEventListener("click", (event) => {
@@ -205,7 +299,8 @@ function renderDomains() {
     if (state.domainFilter === domain) button.classList.add("active");
     button.innerHTML = `<img alt=""><strong></strong><span></span>`;
     button.querySelector("img").src = faviconUrl(`https://${domain}`);
-    button.querySelector("strong").textContent = domain;
+    button.querySelector("strong").textContent = compactText(domain, 26);
+    button.querySelector("strong").title = domain;
     button.querySelector("span").textContent = count;
     button.addEventListener("click", () => {
       state.domainFilter = state.domainFilter === domain ? "" : domain;
@@ -218,22 +313,30 @@ function renderDomains() {
 
 function renderBookmarks() {
   const items = filteredBookmarks();
+  const isEmptyLibrary = state.all.length === 0;
   els.empty.hidden = items.length > 0;
+  els.empty.textContent = isEmptyLibrary ? "No bookmarks found yet." : "No bookmarks match this view.";
   els.bookmarks.replaceChildren(...items.map((item) => {
-    const card = document.createElement("a");
+    const card = document.createElement("article");
     card.className = "bookmark-card";
-    card.href = item.url;
     card.title = item.url;
     card.innerHTML = `
-      <span class="icon-shell"><img class="bookmark-icon" alt=""></span>
-      <span>
-        <span class="bookmark-title"></span>
-        <span class="bookmark-meta">
-          <span class="tag domain"></span>
-          <span class="tag folder"></span>
+      <a class="bookmark-link" href="">
+        <span class="icon-shell"><img class="bookmark-icon" alt=""></span>
+        <span class="bookmark-copy">
+          <span class="bookmark-title"></span>
+          <span class="bookmark-meta">
+            <span class="tag domain"></span>
+            <span class="tag folder"></span>
+          </span>
         </span>
+      </a>
+      <span class="bookmark-actions">
+        <button class="card-action edit-action" type="button">Edit</button>
+        <button class="card-action delete-action" type="button">Delete</button>
       </span>
     `;
+    card.querySelector(".bookmark-link").href = item.url;
     card.querySelector(".bookmark-icon").src = faviconUrl(item.url);
     card.querySelector(".bookmark-title").textContent = item.title;
     card.querySelector(".bookmark-title").title = item.title;
@@ -241,6 +344,13 @@ function renderBookmarks() {
     card.querySelector(".tag.domain").title = item.domain;
     card.querySelector(".tag.folder").textContent = compactText(leafFolder(item.folder), 24);
     card.querySelector(".tag.folder").title = item.folder;
+    card.querySelector(".edit-action").addEventListener("click", () => openBookmarkDialog(item));
+    card.querySelector(".delete-action").addEventListener("click", async () => {
+      const confirmed = confirm(`Delete "${item.title}"?`);
+      if (!confirmed) return;
+      await chrome.bookmarks.remove(item.id);
+      await reloadBookmarks();
+    });
     return card;
   }));
 
@@ -257,11 +367,19 @@ function render() {
 }
 
 async function loadBookmarks() {
-  const tree = await chrome.bookmarks.getTree();
-  state.all = flattenBookmarks(tree);
-  state.folderTree = buildFolderTree(tree);
-  state.folderTree.slice(0, 3).forEach((folder) => state.expandedFolders.add(folder.path));
-  render();
+  try {
+    const tree = await chrome.bookmarks.getTree();
+    state.folderIdByPath = new Map();
+    state.all = flattenBookmarks(tree);
+    state.folderTree = buildFolderTree(tree);
+    state.folderTree.slice(0, 3).forEach((folder) => state.expandedFolders.add(folder.path));
+    render();
+  } catch (error) {
+    els.empty.hidden = false;
+    els.empty.textContent = "Bookmark permission is unavailable. Reload the extension and try again.";
+    els.stats.textContent = "Unable to read bookmarks";
+    console.error(error);
+  }
 }
 
 els.search.addEventListener("input", (event) => {
@@ -282,6 +400,53 @@ els.sortMode.addEventListener("change", (event) => {
   renderBookmarks();
 });
 
+els.addBookmark.addEventListener("click", () => openBookmarkDialog());
+
+els.form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveBookmarkFromDialog();
+});
+
+els.deleteBookmark.addEventListener("click", deleteBookmarkFromDialog);
+
+els.cancelDialog.addEventListener("click", closeBookmarkDialog);
+
+els.dialog.addEventListener("click", (event) => {
+  if (event.target === els.dialog) closeBookmarkDialog();
+});
+
+els.densityToggle.addEventListener("click", () => {
+  state.density = state.density === "compact" ? "comfortable" : "compact";
+  updateDensity();
+});
+
+document.addEventListener("keydown", (event) => {
+  const isTyping = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
+
+  if (els.dialog.open) return;
+
+  if (event.key === "/" && !isTyping) {
+    event.preventDefault();
+    els.search.focus();
+    return;
+  }
+
+  if (event.key === "Escape") {
+    state.query = "";
+    state.domainFilter = "";
+    state.folderFilter = "";
+    els.search.value = "";
+    render();
+    els.search.blur();
+    return;
+  }
+
+  if (event.key === "Enter" && document.activeElement === els.search) {
+    firstVisibleBookmark()?.click();
+  }
+});
+
+updateDensity();
 updateClock();
 setInterval(updateClock, 30_000);
 loadBookmarks();
