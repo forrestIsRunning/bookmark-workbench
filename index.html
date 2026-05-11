@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bookmark Workbench</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <section class="identity" aria-label="Overview">
+          <p class="kicker">Bookmark Workbench</p>
+          <h1 id="clock">--:--</h1>
+          <p id="today" class="muted"></p>
+        </section>
+        <section class="search-wrap">
+          <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="Search title, domain, folder...">
+          <div id="stats" class="stats"></div>
+        </section>
+      </header>
+
+      <section class="quick-row" aria-label="Pinned domains">
+        <div id="domainPills" class="domain-pills"></div>
+      </section>
+
+      <section class="workspace">
+        <aside class="sidebar" aria-label="Bookmark folders">
+          <div class="section-head">
+            <span>Folders</span>
+            <button id="clearFilter" type="button">All</button>
+          </div>
+          <nav id="folders" class="folders"></nav>
+        </aside>
+
+        <section class="content">
+          <div class="section-head content-head">
+            <span id="resultTitle">Bookmarks</span>
+            <select id="sortMode" aria-label="Sort bookmarks">
+              <option value="smart">Smart</option>
+              <option value="title">Title</option>
+              <option value="domain">Domain</option>
+              <option value="folder">Folder</option>
+            </select>
+          </div>
+          <div id="bookmarks" class="bookmark-grid"></div>
+          <div id="empty" class="empty" hidden>No bookmarks match this view.</div>
+        </section>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

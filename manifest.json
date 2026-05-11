@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Bookmark Workbench",
+  "description": "A focused new tab dashboard for Chrome bookmarks.",
+  "version": "1.0.0",
+  "permissions": ["bookmarks", "favicon"],
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  }
+}
