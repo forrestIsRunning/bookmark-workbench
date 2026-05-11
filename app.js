@@ -6,8 +6,9 @@ const state = {
   expandedFolders: new Set(),
   query: "",
   domainFilter: "",
-  sortMode: "smart",
+  sortMode: "manual",
   density: localStorage.getItem("bookmark-workbench-density") || "comfortable",
+  draggingBookmarkId: "",
 };
 
 const locale = navigator.language || "en-US";
@@ -88,6 +89,7 @@ function flattenBookmarks(nodes, trail = []) {
         domain: hostname(node.url),
         folder,
         parentId: node.parentId,
+        index: Number(node.index || 0),
         dateAdded: Number(node.dateAdded || 0),
         haystack: `${node.title || ""} ${node.url} ${folder}`.toLowerCase(),
       });
@@ -151,6 +153,7 @@ function updateClock() {
 
 function sortBookmarks(items) {
   return [...items].sort((a, b) => {
+    if (state.sortMode === "manual") return collator.compare(a.folder, b.folder) || a.index - b.index;
     if (state.sortMode === "title") return collator.compare(a.title, b.title);
     if (state.sortMode === "domain") return collator.compare(a.domain, b.domain) || collator.compare(a.title, b.title);
     if (state.sortMode === "folder") return collator.compare(a.folder, b.folder) || collator.compare(a.title, b.title);
@@ -331,6 +334,36 @@ function findFolderById(id, folders = state.folderTree) {
   return null;
 }
 
+function findBookmarkById(id) {
+  return state.all.find((item) => item.id === id);
+}
+
+function canManualReorder(items) {
+  return state.sortMode === "manual" && !state.query && !state.domainFilter && items.length > 1;
+}
+
+async function moveBookmarkToFolder(bookmarkId, folder) {
+  const bookmark = findBookmarkById(bookmarkId);
+  if (!bookmark || bookmark.parentId === folder.id) return;
+
+  state.folderFilter = folder.path;
+  state.expandedFolders.add(folder.path);
+  await chrome.bookmarks.move(bookmarkId, { parentId: folder.id });
+  await reloadBookmarks();
+}
+
+async function moveBookmarkBefore(bookmarkId, targetId) {
+  if (!bookmarkId || !targetId || bookmarkId === targetId) return;
+
+  const source = findBookmarkById(bookmarkId);
+  const target = findBookmarkById(targetId);
+  if (!source || !target || source.parentId !== target.parentId) return;
+
+  const nextIndex = source.index < target.index ? target.index - 1 : target.index;
+  await chrome.bookmarks.move(bookmarkId, { parentId: target.parentId, index: Math.max(nextIndex, 0) });
+  await reloadBookmarks();
+}
+
 function renderFolders() {
   const rows = [];
 
@@ -346,7 +379,20 @@ function renderFolders() {
   els.folders.replaceChildren(...rows.map((folder) => {
     const row = document.createElement("div");
     row.className = `folder-row${state.folderFilter === folder.path ? " active" : ""}`;
+    row.dataset.folderId = folder.id;
     row.style.setProperty("--depth", folder.depth);
+    row.addEventListener("dragover", (event) => {
+      if (!state.draggingBookmarkId) return;
+      event.preventDefault();
+      row.classList.add("drop-target");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drop-target"));
+    row.addEventListener("drop", async (event) => {
+      event.preventDefault();
+      row.classList.remove("drop-target");
+      await moveBookmarkToFolder(state.draggingBookmarkId, folder);
+      state.draggingBookmarkId = "";
+    });
 
     const toggle = document.createElement("button");
     toggle.type = "button";
@@ -419,12 +465,15 @@ function renderDomains() {
 
 function renderBookmarks() {
   const items = filteredBookmarks();
+  const manualReorder = canManualReorder(items);
   const isEmptyLibrary = state.all.length === 0;
   els.empty.hidden = items.length > 0;
   els.empty.textContent = isEmptyLibrary ? "No bookmarks found yet." : "No bookmarks match this view.";
   els.bookmarks.replaceChildren(...items.map((item) => {
     const card = document.createElement("article");
     card.className = "bookmark-card";
+    card.draggable = true;
+    card.dataset.bookmarkId = item.id;
     card.title = item.url;
     card.innerHTML = `
       <a class="bookmark-link" href="">
@@ -457,13 +506,41 @@ function renderBookmarks() {
       await chrome.bookmarks.remove(item.id);
       await reloadBookmarks();
     });
+    card.addEventListener("dragstart", (event) => {
+      state.draggingBookmarkId = item.id;
+      card.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", item.id);
+    });
+    card.addEventListener("dragend", () => {
+      state.draggingBookmarkId = "";
+      card.classList.remove("dragging");
+      document.querySelectorAll(".drop-target, .drop-before").forEach((node) => {
+        node.classList.remove("drop-target", "drop-before");
+      });
+    });
+    card.addEventListener("dragover", (event) => {
+      if (!manualReorder || !state.draggingBookmarkId || item.id === state.draggingBookmarkId) return;
+      const source = findBookmarkById(state.draggingBookmarkId);
+      if (!source || source.parentId !== item.parentId) return;
+      event.preventDefault();
+      card.classList.add("drop-before");
+    });
+    card.addEventListener("dragleave", () => card.classList.remove("drop-before"));
+    card.addEventListener("drop", async (event) => {
+      if (!manualReorder) return;
+      event.preventDefault();
+      card.classList.remove("drop-before");
+      await moveBookmarkBefore(state.draggingBookmarkId, item.id);
+    });
     return card;
   }));
 
   const suffix = state.folderFilter || state.domainFilter || "Bookmarks";
   els.resultTitle.textContent = suffix;
   const filters = [state.folderFilter && "folder", state.domainFilter && "domain", state.query && "search"].filter(Boolean);
-  els.stats.textContent = `${items.length} shown / ${state.all.length} total${filters.length ? ` · ${filters.join(" + ")}` : ""}`;
+  const dragHint = state.sortMode === "manual" ? " · drag to reorder or move" : " · drag to folders";
+  els.stats.textContent = `${items.length} shown / ${state.all.length} total${filters.length ? ` · ${filters.join(" + ")}` : ""}${dragHint}`;
 }
 
 function render() {
