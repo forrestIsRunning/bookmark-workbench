@@ -122,7 +122,7 @@ function buildFolderTree(nodes, trail = [], depth = 0) {
     const children = buildFolderTree(node.children || [], nextTrail, depth + 1);
     const count = countBookmarks(node);
 
-    if (path && count > 0) {
+    if (path) {
       state.folderIdByPath.set(path, node.id);
       folders.push({
         id: node.id,
