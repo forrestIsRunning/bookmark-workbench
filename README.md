@@ -1,39 +1,44 @@
 # Bookmark Workbench
 
-Bookmark Workbench is a privacy-first Chrome new tab extension for people who keep research links, docs, internal tools, videos, and daily workflows in Chrome bookmarks.
+Bookmark Workbench is a Chrome extension that replaces the new tab page with a practical bookmark manager.
 
-It turns the default new tab into a compact bookmark workspace with nested folders, search, editing, and dense cards.
+It is built for people who keep many links in Chrome bookmarks and want a faster way to search, organize, edit, and move them without opening Chrome's default bookmark manager.
 
-## Features
+## What It Does
 
-- Browse Chrome bookmarks in a focused new tab dashboard.
-- Filter by nested folders; parent folders include bookmarks from subfolders.
-- Search by title, domain, URL, and folder path.
-- Sort by recent, title, domain, or folder.
-- Add, edit, and delete bookmarks directly from the page.
-- Create, rename, and delete folders from the folder tree.
-- Right-click a folder to create a subfolder, rename it, or delete it.
-- Drag bookmarks onto folders to move them.
-- Use `Manual` sort to drag bookmarks before another bookmark in the same folder.
-- Toggle compact density for larger bookmark collections.
-- Use keyboard shortcuts: `/` to search, `Enter` to open the first result, `Esc` to clear filters.
-- Respect the browser language for date/time formatting and sorting.
-- Support light and dark system color schemes.
+- Shows your Chrome bookmarks in a clean new tab dashboard.
+- Keeps your existing Chrome bookmark data; there is no separate database.
+- Supports nested folders, including empty folders.
+- Lets you search by title, URL, domain, and folder path.
+- Lets you add, edit, delete, drag, and move bookmarks.
+- Lets you create, rename, delete, and right-click manage folders.
+- Supports compact mode, light/dark mode, and keyboard shortcuts.
+- Automatically refreshes when bookmarks or folders change.
+
+## Common Use Cases
+
+- Clean up a large bookmark collection.
+- Move links between folders by dragging them.
+- Create subfolders quickly from the folder tree.
+- Use a more useful new tab page for daily links, docs, tools, and reading lists.
+- Keep bookmark organization local to Chrome without sending data to a server.
 
 ## Install
 
-### Option 1: Ask an AI coding assistant
+Bookmark Workbench is currently installed as an unpacked Chrome extension.
 
-If you use Codex, Claude Code, Cursor, or another local coding assistant, you can ask it to install the extension for you:
+### Install With an AI Coding Assistant
+
+If you use Codex, Claude Code, Cursor, or another local coding assistant, you can ask it:
 
 ```text
 Clone https://github.com/forrestIsRunning/bookmark-workbench,
-then help me load it as an unpacked Chrome extension from chrome://extensions.
+then help me load it as an unpacked Chrome extension in Chrome.
 ```
 
-This is often the easiest path because the assistant can clone the repository, open the extension folder, and guide you through Chrome's final confirmation step.
+The assistant can clone the repository and open the right folder. Chrome still requires you to confirm loading the extension from `chrome://extensions`.
 
-### Option 2: Manual install from Git
+### Install Manually From Git
 
 ```bash
 git clone https://github.com/forrestIsRunning/bookmark-workbench.git
@@ -42,34 +47,54 @@ git clone https://github.com/forrestIsRunning/bookmark-workbench.git
 Then:
 
 1. Open `chrome://extensions`.
-2. Enable `Developer mode`.
+2. Turn on `Developer mode`.
 3. Click `Load unpacked`.
 4. Select the cloned `bookmark-workbench` folder.
 5. Open a new tab.
 
-### Option 3: Manual install from ZIP
+### Install Manually From ZIP
 
 1. Download this repository as a ZIP from GitHub.
-2. Unzip it locally.
+2. Unzip it.
 3. Open `chrome://extensions`.
-4. Enable `Developer mode`.
+4. Turn on `Developer mode`.
 5. Click `Load unpacked`.
 6. Select the unzipped folder.
+7. Open a new tab.
+
+## How To Use
+
+- Search from the top input.
+- Click a folder to filter bookmarks.
+- Right-click a folder to create a subfolder, rename it, or delete it.
+- Click `Add` to create a bookmark in the current folder.
+- Hover a bookmark card to edit or delete it.
+- Drag a bookmark onto a folder to move it.
+- Choose `Manual` sorting to reorder bookmarks by dragging them before another bookmark in the same folder.
+
+Keyboard shortcuts:
+
+- `/`: focus search
+- `Enter`: open the first visible bookmark while search is focused
+- `Esc`: clear filters and search
 
 ## Permissions
 
-Bookmark Workbench asks for:
+Bookmark Workbench asks for two Chrome permissions:
 
-- `bookmarks`: read, create, update, and delete your Chrome bookmarks and folders.
-- `favicon`: show site icons for bookmark cards.
+- `bookmarks`: read, create, update, move, and delete Chrome bookmarks and folders.
+- `favicon`: show site icons on bookmark cards.
 
-The extension does not send bookmark data to any server.
+The extension does not send bookmark data to any server. All bookmark operations use Chrome's local extension APIs.
 
 ## Development
 
-There is no build step. The extension is plain HTML, CSS, and JavaScript.
+There is no build step. The extension uses plain HTML, CSS, and JavaScript.
 
-After editing files, reload the extension in `chrome://extensions` and open a new tab.
+After editing files:
+
+1. Reload the extension in `chrome://extensions`.
+2. Open a new tab.
 
 ## License
 
